@@ -6,7 +6,7 @@ public class Classification {
     private String name;
     private String type;
     private String className;
-    private List<String> images;
+    private String image;
 
     // Getters and Setters
 
@@ -34,11 +34,11 @@ public class Classification {
         this.className = className;
     }
 
-    public List<String> getImages() {
-        return images;
+    public String getImage() {
+        return image;
     }
 
-    public void setImages(List<String> images) {
-        this.images = images;
+    public void setImage(String image) {
+        this.image = image;
     }
 }

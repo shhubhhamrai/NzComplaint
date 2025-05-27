@@ -50,7 +50,7 @@ public class NzHomepagePage {
         wait.until(ExpectedConditions.invisibilityOfElementLocated(By.id("loader"))); // optional: if a loader exists
         wait.withTimeout(Duration.ofSeconds(12)); // to account for long load time
         WebElement firstCase = wait.until(ExpectedConditions.elementToBeClickable(
-                By.cssSelector("a[id*='gvwIPCases_lnkBtnCaseBrowser_0']")));
+                By.cssSelector("a[id*='gvwIPCases_lnkBtnCaseBrowser_3']")));
         firstCase.click();
     }
 

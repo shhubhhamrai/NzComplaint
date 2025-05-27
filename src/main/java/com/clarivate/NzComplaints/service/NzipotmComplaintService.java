@@ -12,9 +12,6 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeOptions;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import io.github.bonigarcia.wdm.WebDriverManager;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -61,6 +58,7 @@ public class NzipotmComplaintService {
             BibliographicDataPage biblioPage = new BibliographicDataPage(driver);
             BibliographicData biblio = biblioPage.readBibliographicData();
 
+
             String applicationNo = biblio.getApplicationNumber();
             String firstActionType = biblio.getFirstActionType();
             LocalDate firstActionDate = parseDate(biblio.getFirstActionDate());
@@ -70,7 +68,7 @@ public class NzipotmComplaintService {
             binder.setFirstActionDate(firstActionDate);
             binder.setDomains(List.of("TM", "CR", "DM", "PT"));
 
-            String decisionReference = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+            String decisionReference = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE)+"_Complaint_IS";
 
             Decision decision = new Decision();
             decision.setId(UUID.randomUUID().toString());
@@ -92,10 +90,12 @@ public class NzipotmComplaintService {
 
             binder.setParties(List.of(applicant, redParty));
 
+            String classificationImage = biblioPage.getImageAsBase64(driver);
             Classification classification = new Classification();
             classification.setName(biblio.getMarkName());
             classification.setType(biblio.getMarkType());
             classification.setClassName(biblio.getTrademarkClass());
+            classification.setImage(classificationImage);
 
             Right right = new Right();
             right.setId("right1");
@@ -107,17 +107,14 @@ public class NzipotmComplaintService {
 
             binder.setRights(List.of(right));
 
+            String docketReference = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE);
             Docket docket = new Docket();
             docket.setId("docket1");
-            docket.setReference(decisionReference);
+            docket.setReference(docketReference);
             docket.setCourtId("court1");
             docket.setJudge("Judge X");
 
             binder.setDockets(List.of(docket));
-
-            // --- Logging existing PDFs before download ---
-            System.out.println("Existing PDF files before download:");
-            listPdfFiles();
 
             // --- Download document ---
             biblioPage.clickDocumentsTab();
@@ -131,7 +128,7 @@ public class NzipotmComplaintService {
             Path downloadedPdf = waitForNewDownload(beforeFiles, ".pdf", 30);
             if (downloadedPdf != null) {
                 // Create unique filename with timestamp
-                String uniqueFileName = decisionReference + "_" + System.currentTimeMillis() + ".pdf";
+                String uniqueFileName = decisionReference + "_" + ".pdf";
                 Path renamedPdf = Paths.get(DOWNLOAD_DIR, uniqueFileName);
                 Files.move(downloadedPdf, renamedPdf, StandardCopyOption.REPLACE_EXISTING);
                 System.out.println("PDF downloaded and renamed to: " + renamedPdf.getFileName());
@@ -139,18 +136,14 @@ public class NzipotmComplaintService {
                 System.out.println("PDF not found or download timed out.");
             }
 
-            // --- Logging PDFs after download ---
-            System.out.println("PDF files after download:");
-            listPdfFiles();
-
             // Export JSON with JavaTimeModule
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
             mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
             Path jsonOutput = Paths.get(DOWNLOAD_DIR, decisionReference + ".js");
-            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(binder);
-            Files.writeString(jsonOutput, json);
+            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(binder);// Pretty printed and converted to json
+            Files.writeString(jsonOutput, json);// File Write
             System.out.println("JSON exported to: " + jsonOutput.getFileName());
 
         } catch (Exception e) {
@@ -197,18 +190,6 @@ public class NzipotmComplaintService {
         return null;
     }
 
-    /**
-     * Lists all PDFs in the download directory.
-     */
-    private void listPdfFiles() throws IOException {
-        Files.list(Paths.get(DOWNLOAD_DIR))
-                .filter(p -> p.toString().endsWith(".pdf"))
-                .forEach(p -> System.out.println(" - " + p.getFileName()));
-    }
-
-    /**
-     * Returns a Set of PDF files currently in the download directory.
-     */
     private Set<Path> listPdfFileSet() throws IOException {
         Set<Path> set = new HashSet<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(DOWNLOAD_DIR), "*.pdf")) {

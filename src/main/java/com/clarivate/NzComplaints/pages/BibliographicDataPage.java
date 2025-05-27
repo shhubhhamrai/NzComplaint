@@ -5,7 +5,11 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 
 public class BibliographicDataPage {
@@ -135,7 +139,27 @@ public class BibliographicDataPage {
             return new String[]{"not found", "not found"};
         }
     }
+    public String getImageAsBase64(WebDriver driver) throws Exception {
+        WebElement imageLink = driver.findElement(By.id("MainContent_ctrlTM_ctrlPictureList_lvDocumentView_hlnkCasePicture_0"));
 
+        String imageUrl = imageLink.getAttribute("href"); // full-size image URL
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            byte[] imageBytes = downloadImageBytes(imageUrl);
+            if (imageBytes != null) {
+                return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(imageBytes);
+            }
+        }
+        return null;
+    }
+
+    private byte[] downloadImageBytes(String imageUrl) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(imageUrl).openConnection();
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0");
+        connection.connect();
+        try (InputStream in = connection.getInputStream()) {
+            return in.readAllBytes();
+        }
+    }
     public void clickDocumentsTab() {
         try {
             WebElement documentsTab = wait.until(ExpectedConditions.elementToBeClickable(
