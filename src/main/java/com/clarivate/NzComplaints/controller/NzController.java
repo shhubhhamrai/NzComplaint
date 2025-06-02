@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class NzController {
 
     private final NzipotmComplaintService nzipotmComplaintService;
-    @Autowired
     public NzController(NzipotmComplaintService nzipotmComplaintService) {
         this.nzipotmComplaintService = nzipotmComplaintService;
     }

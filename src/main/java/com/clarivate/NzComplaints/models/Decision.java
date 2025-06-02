@@ -1,6 +1,7 @@
 package com.clarivate.NzComplaints.models;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 public class Decision {
     private String id;
@@ -9,6 +10,7 @@ public class Decision {
     private String level; // e.g., "First Instance"
     private String nature; // e.g., "Complaints & Hearings"
     private String robotSource;
+
 
     // Getters and Setters
 

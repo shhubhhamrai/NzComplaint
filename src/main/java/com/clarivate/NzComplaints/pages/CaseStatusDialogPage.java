@@ -4,18 +4,12 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class CaseStatusDialogPage {
 
-    private final WebDriver driver;
-    private final JavascriptExecutor js;
 
-    public CaseStatusDialogPage(WebDriver driver, JavascriptExecutor js) {
-        this.driver = driver;
-        this.js = js;
-    }
-
-    public void selectCaseStatusesAndConfirm() throws InterruptedException {
+    public void selectCaseStatusesAndConfirm(WebDriver driver, WebDriverWait wait) throws InterruptedException {
         // Checkbox 7
         WebElement checkbox7 = driver.findElement(By.id(
                 "MainContent_ctrlTMSearch_ctrlCaseStatusSearchDialog_ctrlCaseStatusSearch_ctrlCaseStatusList_gvCaseStatuss_chckbxSelected_7"

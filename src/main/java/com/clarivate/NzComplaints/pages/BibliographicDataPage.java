@@ -1,9 +1,10 @@
 package com.clarivate.NzComplaints.pages;
 
-import com.clarivate.NzComplaints.dto.BibliographicData;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -13,13 +14,13 @@ import java.util.Base64;
 import java.util.List;
 
 public class BibliographicDataPage {
-    private final WebDriver driver;
-    private final WebDriverWait wait;
+    private static final Logger logger = LoggerFactory.getLogger(BibliographicDataPage.class);
 
-    public BibliographicDataPage(WebDriver driver) {
-        this.driver = driver;
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-    }
+//    private final WebDriverWait wait;
+
+//    public BibliographicDataPage(WebDriver driver) {
+//        this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+//    }
 
     private String getTextOrValue(WebElement element) {
         String tag = element.getTagName();
@@ -30,72 +31,72 @@ public class BibliographicDataPage {
         return element.getText().trim();
     }
 
-    public String getApplicationNumber() {
+    public String getApplicationNumber(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("MainContent_ctrlTM_txtAppNr")));
             return getTextOrValue(element);
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting application number: " + e.getMessage());
+            logger.error("Error extracting application number", e);
             return "not found";
         }
     }
 
-    public String getApplicantName() {
+    public String getApplicantName(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement applicantCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//table[@id='MainContent_ctrlTM_ctrlApplicant_ctrlApplicant_gvCustomers']//tr[contains(@class,'alt1')]/td[2]")));
             return applicantCell.getText().trim();
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting applicant name: " + e.getMessage());
+            logger.error("Error extracting applicant name", e);
             return "not found";
         }
     }
 
-    public String getApplicantAddress() {
+    public String getApplicantAddress(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement addressCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//table[@id='MainContent_ctrlTM_ctrlApplicant_ctrlApplicant_gvCustomers']//tr[contains(@class,'alt1')]/td[3]")));
             return addressCell.getText().trim();
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting applicant address: " + e.getMessage());
+            logger.error("Error extracting applicant address", e);
             return "not found";
         }
     }
 
-    public String getTrademarkClass() {
+    public String getTrademarkClass(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement classCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//table[@id='MainContent_ctrlTM_ctrlClassif_gvClassifications']//tr[contains(@class,'alt1')]/td[1]")));
             return classCell.getText().trim();
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting trademark class: " + e.getMessage());
+            logger.error("Error extracting trademark class", e);
             return "not found";
         }
     }
 
-    public String getMarkType() {
+    public String getMarkType(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement markTypeTd = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//tr[@id='MainContent_ctrlTM_trTMType']//td[contains(@class,'data')]")));
             return markTypeTd.getText().trim();
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting mark type: " + e.getMessage());
+            logger.error("Error extracting mark type", e);
             return "not found";
         }
     }
 
-    public String getMarkName() {
+    public String getMarkName(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement markNameTd = wait.until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//tr[@id='MainContent_ctrlTM_trTMName']//td[contains(@class,'data')]")));
             return markNameTd.getText().trim();
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting mark name: " + e.getMessage());
+            logger.error("Error extracting mark name", e);
             return "not found";
         }
     }
 
-    public String getRedParty() {
+    public String getRedParty(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement table = wait.until(ExpectedConditions.presenceOfElementLocated(
                     By.id("MainContent_ctrlProcedureList_gvwIPCases")));
@@ -111,12 +112,12 @@ public class BibliographicDataPage {
             }
             return "not found";
         } catch (NoSuchElementException | TimeoutException e) {
-            System.err.println("Error extracting Red Party info: " + e.getMessage());
+            logger.error("Error extracting Red Party info", e);
             return "not found";
         }
     }
 
-    public String[] getFirstActionDetails() {
+    public String[] getFirstActionDetails(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement historyTab = wait.until(ExpectedConditions.elementToBeClickable(By.id("ui-id-2")));
             historyTab.click();
@@ -132,22 +133,26 @@ public class BibliographicDataPage {
             return new String[]{firstActionType, firstActionDate};
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
-            System.err.println("Interrupted while waiting for history tab: " + ie.getMessage());
+            logger.error("Interrupted while waiting for history tab", ie);
             return new String[]{"not found", "not found"};
         } catch (Exception e) {
-            System.err.println("Error extracting first action details: " + e.getMessage());
+            logger.error("Error extracting first action details", e);
             return new String[]{"not found", "not found"};
         }
     }
-    public String getImageAsBase64(WebDriver driver) throws Exception {
-        WebElement imageLink = driver.findElement(By.id("MainContent_ctrlTM_ctrlPictureList_lvDocumentView_hlnkCasePicture_0"));
 
-        String imageUrl = imageLink.getAttribute("href"); // full-size image URL
-        if (imageUrl != null && !imageUrl.isBlank()) {
-            byte[] imageBytes = downloadImageBytes(imageUrl);
-            if (imageBytes != null) {
-                return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(imageBytes);
+    public String getImageAsBase64(WebDriver driver) {
+        try {
+            WebElement imageLink = driver.findElement(By.id("MainContent_ctrlTM_ctrlPictureList_lvDocumentView_hlnkCasePicture_0"));
+            String imageUrl = imageLink.getAttribute("href");
+            if (imageUrl != null && !imageUrl.isBlank()) {
+                byte[] imageBytes = downloadImageBytes(imageUrl);
+                if (imageBytes != null) {
+                    return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(imageBytes);
+                }
             }
+        } catch (Exception e) {
+            logger.error("Error retrieving base64 image", e);
         }
         return null;
     }
@@ -160,52 +165,32 @@ public class BibliographicDataPage {
             return in.readAllBytes();
         }
     }
-    public void clickDocumentsTab() {
+
+    public void clickDocumentsTab(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement documentsTab = wait.until(ExpectedConditions.elementToBeClickable(
-                    By.xpath("//a[@href='#MainContent_tabDocuments' and contains(text(),'Documents')]")
-            ));
+                    By.xpath("//a[@href='#MainContent_tabDocuments' and contains(text(),'Documents')]")));
             documentsTab.click();
-            // Wait a short time for the tab content to load
             Thread.sleep(2000);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
-            System.err.println("Interrupted while clicking Documents tab: " + ie.getMessage());
+            logger.error("Interrupted while clicking Documents tab", ie);
         } catch (Exception e) {
-            System.err.println("Error clicking Documents tab: " + e.getMessage());
+            logger.error("Error clicking Documents tab", e);
         }
     }
 
-    public void clickFirstDocumentLink() {
+    public void clickFirstDocumentLink(WebDriver driver,WebDriverWait wait) {
         try {
             WebElement firstDocLink = wait.until(ExpectedConditions.elementToBeClickable(
-                    By.id("MainContent_ctrlDocumentList_gvDocuments_hnkView_0")
-            ));
+                    By.id("MainContent_ctrlDocumentList_gvDocuments_hnkView_0")));
             firstDocLink.click();
-            // Optionally wait a moment for the download to initiate
             Thread.sleep(2000);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
-            System.err.println("Interrupted while clicking first document link: " + ie.getMessage());
+            logger.error("Interrupted while clicking first document link", ie);
         } catch (Exception e) {
-            System.err.println("Error clicking first document link: " + e.getMessage());
+            logger.error("Error clicking first document link", e);
         }
-    }
-
-    public BibliographicData readBibliographicData() {
-        BibliographicData data = new BibliographicData();
-        data.setApplicationNumber(getApplicationNumber());
-        data.setApplicantName(getApplicantName());
-        data.setApplicantAddress(getApplicantAddress());
-        data.setTrademarkClass(getTrademarkClass());
-        data.setMarkType(getMarkType());
-        data.setMarkName(getMarkName());
-        data.setRedParty(getRedParty());
-
-        String[] actionDetails = getFirstActionDetails();
-        data.setFirstActionType(actionDetails[0]);
-        data.setFirstActionDate(actionDetails[1]);
-
-        return data;
     }
 }

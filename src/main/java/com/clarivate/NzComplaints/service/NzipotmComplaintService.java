@@ -1,6 +1,5 @@
 package com.clarivate.NzComplaints.service;
 
-import com.clarivate.NzComplaints.dto.BibliographicData;
 import com.clarivate.NzComplaints.models.*;
 import com.clarivate.NzComplaints.pages.BibliographicDataPage;
 import com.clarivate.NzComplaints.pages.CaseStatusDialogPage;
@@ -12,169 +11,230 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeOptions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class NzipotmComplaintService {
 
     private static final String IPONZ_URL = "https://app.iponz.govt.nz/app/Extra/IP/TM/Qbe.aspx?sid=638835487657819172&op=EXTRA_tm_qbe&fcoOp=EXTRA__Default&directAccess=true";
     private static final String DOWNLOAD_DIR = System.getProperty("user.home") + "/Downloads";
+    private static final Logger logger = LoggerFactory.getLogger(NzipotmComplaintService.class);
+    private WebDriver driver;
+    private WebDriverWait wait;
+    private JavascriptExecutor js;
+    private NzHomepagePage homepage;
+    private CaseStatusDialogPage statusDialog;
+    private BibliographicDataPage biblioPage;
+
+    private Binder binder;
+
+    private String applicationNo;
+    private String applicantName;
+    private String applicantAddress;
+    private String markName;
+    private String markType;
+    private String trademarkClass;
+    private String redParty;
+    private String firstActionType;
+    private String firstActionDateStr;
+    private String base64Image;
 
     public Binder runRobot() {
-        Binder binder = new Binder();
+        binder = new Binder();
+        initializeDriver();
+        try {
+            loadHomepage();
+        } catch (Exception e) {
+            logger.error("Error in loadHomepage: {}", e.getMessage(), e);
+        } finally {
+            driver.quit();
+        }
+        return binder;
+    }
 
+    // ----------------------- Initialization -----------------------
 
+    private void initializeDriver() {
         EdgeOptions options = new EdgeOptions();
         options.addArguments("--start-maximized");
+        driver = new EdgeDriver(options);
+        js = (JavascriptExecutor) driver;
+        wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+    }
 
-        WebDriver driver = new EdgeDriver(options);
-        JavascriptExecutor js = (JavascriptExecutor) driver;
+    private void loadHomepage() throws Exception {
+        homepage = new NzHomepagePage();
+        statusDialog = new CaseStatusDialogPage();
+
+        homepage.navigateToWebsite(driver,wait,IPONZ_URL);
+        statusDialog.selectCaseStatusesAndConfirm(driver,wait);
+        Thread.sleep(5000);
+        searchCases();
+    }
+
+    private void searchCases() throws Exception {
+        homepage.clickSearchButton(driver,wait);
+        biblioPage = new BibliographicDataPage();
+        extractBibliographicData(); // Proceed to extraction
+    }
+
+    // ----------------------- Data Extraction -----------------------
+
+    private void extractBibliographicData() throws Exception {
+        applicationNo = biblioPage.getApplicationNumber(driver, wait);
+        applicantName = biblioPage.getApplicantName(driver, wait);
+        applicantAddress = biblioPage.getApplicantAddress(driver, wait);
+        markName = biblioPage.getMarkName(driver, wait);
+        markType = biblioPage.getMarkType(driver, wait);
+        trademarkClass = biblioPage.getTrademarkClass(driver, wait);
+        redParty = biblioPage.getRedParty(driver, wait);
+
+        String[] actionDetails = biblioPage.getFirstActionDetails(driver, wait);
+        firstActionType = actionDetails[0];
+        firstActionDateStr = actionDetails[1];
 
         try {
-            // Initialize pages
-            NzHomepagePage homepage = new NzHomepagePage(driver, js);
-            CaseStatusDialogPage statusDialog = new CaseStatusDialogPage(driver, js);
+            base64Image = biblioPage.getImageAsBase64(driver);
+        } catch (Exception e) {
+            base64Image = "not found";
+            logger.warn("Image extraction failed: {}", e.getMessage(), e);
+        }
 
-            homepage.navigateToWebsite(IPONZ_URL);
-            homepage.clickClassificationStatus();
-            homepage.clickSelectStatus();
-            statusDialog.selectCaseStatusesAndConfirm();
-            Thread.sleep(5000);
-            homepage.clickSearchButton();
-            Thread.sleep(10000);
+        populateBinder();
+    }
 
-            homepage.sortByCaseNumber();
-            Thread.sleep(10000);
+    private void populateBinder() throws Exception {
+        LocalDate firstActionDate = parseDate(firstActionDateStr);
 
-            homepage.openFirstCase();
-            Thread.sleep(10000);
+        binder.setId(UUID.randomUUID().toString());
+        binder.setFirstAction(firstActionType);
+        binder.setFirstActionDate(firstActionDate);
+        binder.setDomains(List.of("TM", "CR", "DM", "PT"));
 
-            BibliographicDataPage biblioPage = new BibliographicDataPage(driver);
-            BibliographicData biblio = biblioPage.readBibliographicData();
+        String decisionRef = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE) + "_Complaint_IS";
+        Decision decision = new Decision();
+        decision.setId(UUID.randomUUID().toString());
+        decision.setReference(decisionRef);
+        decision.setJudgmentDate(firstActionDate);
+        decision.setNature("Complaints & Hearings");
+        decision.setLevel("Opposition");
+        decision.setRobotSource("NZ_IPONZ_TRADEMARKS");
+        binder.setDecisions(List.of(decision));
 
+        Party applicant = new Party();
+        applicant.setName(applicantName);
+        applicant.setType("Applicant");
 
-            String applicationNo = biblio.getApplicationNumber();
-            String firstActionType = biblio.getFirstActionType();
-            LocalDate firstActionDate = parseDate(biblio.getFirstActionDate());
+        Party red = new Party();
+        red.setName(redParty);
+        red.setType("Red Party");
 
-            binder.setId(UUID.randomUUID().toString());
-            binder.setFirstAction(firstActionType);
-            binder.setFirstActionDate(firstActionDate);
-            binder.setDomains(List.of("TM", "CR", "DM", "PT"));
+        binder.setParties(List.of(applicant, red));
 
-            String decisionReference = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE)+"_Complaint_IS";
+        Classification classification = new Classification();
+        classification.setName(markName);
+        classification.setType(markType);
+        classification.setClassName(trademarkClass);
+        classification.setImage(base64Image);
 
-            Decision decision = new Decision();
-            decision.setId(UUID.randomUUID().toString());
-            decision.setReference(decisionReference);
-            decision.setJudgmentDate(firstActionDate);
-            decision.setNature("Complaints & Hearings");
-            decision.setLevel("Opposition");
-            decision.setRobotSource("NZ_IPONZ_TRADEMARKS");
+        Right right = new Right();
+        right.setId("right1");
+        right.setOpponent(false);
+        right.setClassification(classification);
+        right.setName(markName);
+        right.setType("TM");
+        right.setReference(applicationNo);
 
-            binder.setDecisions(List.of(decision));
+        binder.setRights(List.of(right));
 
-            Party applicant = new Party();
-            applicant.setName(biblio.getApplicantName());
-            applicant.setType("Applicant");
+        String docketRef = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+        Docket docket = new Docket();
+        docket.setId("docket1");
+        docket.setReference(docketRef);
+        docket.setCourtId("court1");
+        docket.setJudge("Judge X");
 
-            Party redParty = new Party();
-            redParty.setName(biblio.getRedParty());
-            redParty.setType("Red Party");
+        binder.setDockets(List.of(docket));
 
-            binder.setParties(List.of(applicant, redParty));
+        downloadAndRenameDocument();
+    }
 
-            String classificationImage = biblioPage.getImageAsBase64(driver);
-            Classification classification = new Classification();
-            classification.setName(biblio.getMarkName());
-            classification.setType(biblio.getMarkType());
-            classification.setClassName(biblio.getTrademarkClass());
-            classification.setImage(classificationImage);
+    // ----------------------- Document Handling -----------------------
 
-            Right right = new Right();
-            right.setId("right1");
-            right.setOpponent(false);
-            right.setClassification(classification);
-            right.setName(biblio.getMarkName());
-            right.setType("TM");
-            right.setReference(applicationNo);
-
-            binder.setRights(List.of(right));
-
-            String docketReference = "nz-nzipotm-op-" + applicationNo + "_" + firstActionDate.format(DateTimeFormatter.BASIC_ISO_DATE);
-            Docket docket = new Docket();
-            docket.setId("docket1");
-            docket.setReference(docketReference);
-            docket.setCourtId("court1");
-            docket.setJudge("Judge X");
-
-            binder.setDockets(List.of(docket));
-
-            // --- Download document ---
-            biblioPage.clickDocumentsTab();
-
-            // Get current files before clicking document link
+    private void downloadAndRenameDocument() throws IOException {
+        try {
+            biblioPage.clickDocumentsTab(driver,wait);
             Set<Path> beforeFiles = listPdfFileSet();
+            biblioPage.clickFirstDocumentLink(driver,wait);
 
-            biblioPage.clickFirstDocumentLink();
-
-            // Wait for new PDF to appear in the folder
             Path downloadedPdf = waitForNewDownload(beforeFiles, ".pdf", 30);
             if (downloadedPdf != null) {
-                // Create unique filename with timestamp
-                String uniqueFileName = decisionReference + "_" + ".pdf";
-                Path renamedPdf = Paths.get(DOWNLOAD_DIR, uniqueFileName);
+                String fileName = "nz-nzipotm-op-" + applicationNo + "_" +
+                        binder.getFirstActionDate().format(DateTimeFormatter.BASIC_ISO_DATE) + "_Complaint_IS_.pdf";
+                Path renamedPdf = Paths.get(DOWNLOAD_DIR, fileName);
                 Files.move(downloadedPdf, renamedPdf, StandardCopyOption.REPLACE_EXISTING);
                 System.out.println("PDF downloaded and renamed to: " + renamedPdf.getFileName());
             } else {
-                System.out.println("PDF not found or download timed out.");
+                logger.warn("PDF not found or download timed out.");
             }
+        } catch (Exception e) {
+            logger.error("Error during PDF download and renaming: {}", e.getMessage(), e);
+        }
 
-            // Export JSON with JavaTimeModule
+        exportBinderToJson();
+    }
+
+    // ----------------------- JSON Export -----------------------
+
+    private void exportBinderToJson() throws IOException {
+        try {
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
             mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-            Path jsonOutput = Paths.get(DOWNLOAD_DIR, decisionReference + ".js");
-            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(binder);// Pretty printed and converted to json
-            Files.writeString(jsonOutput, json);// File Write
-            System.out.println("JSON exported to: " + jsonOutput.getFileName());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            driver.quit();
+            String fileName = "nz-nzipotm-op-" + applicationNo + "_" +
+                    binder.getFirstActionDate().format(DateTimeFormatter.BASIC_ISO_DATE) + "_Complaint_IS.js";
+            Path jsonOutput = Paths.get(DOWNLOAD_DIR, fileName);
+            Files.writeString(jsonOutput, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(binder));
+            logger.info("JSON exported to: {}", jsonOutput.getFileName());
+        } catch (IOException e) {
+            logger.error("Error exporting JSON: {}", e.getMessage(), e);
         }
-
-        return binder;
     }
+
+    // ----------------------- Utilities -----------------------
 
     private LocalDate parseDate(String dateStr) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
         return LocalDate.parse(dateStr, formatter);
     }
 
-    /**
-     * Waits for a new file with the specified extension to appear in the directory,
-     * ignoring files already present in beforeFiles.
-     */
+    private Set<Path> listPdfFileSet() throws IOException {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(DOWNLOAD_DIR), "*.pdf")) {
+            Set<Path> set = new HashSet<>();
+            for (Path file : stream) set.add(file);
+            return set;
+        }
+    }
+
     private Path waitForNewDownload(Set<Path> beforeFiles, String extension, int timeoutSeconds) throws InterruptedException, IOException {
         Path dir = Paths.get(DOWNLOAD_DIR);
-
         for (int i = 0; i < timeoutSeconds; i++) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*" + extension)) {
                 for (Path file : stream) {
                     if (!beforeFiles.contains(file)) {
-                        // Ignore temp download files
                         Path crDownload = Paths.get(file.toString() + ".crdownload");
                         if (Files.exists(file) && !Files.exists(crDownload)) {
-                            // Confirm the file is not growing (still writing)
                             long size1 = Files.size(file);
                             Thread.sleep(1000);
                             long size2 = Files.size(file);
@@ -189,15 +249,4 @@ public class NzipotmComplaintService {
         }
         return null;
     }
-
-    private Set<Path> listPdfFileSet() throws IOException {
-        Set<Path> set = new HashSet<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(DOWNLOAD_DIR), "*.pdf")) {
-            for (Path file : stream) {
-                set.add(file);
-            }
-        }
-        return set;
-    }
-
 }

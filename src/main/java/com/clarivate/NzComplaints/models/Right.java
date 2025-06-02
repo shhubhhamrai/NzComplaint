@@ -57,4 +57,5 @@ public class Right {
     public void setReference(String reference) {
         this.reference = reference;
     }
+
 }
